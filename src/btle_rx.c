@@ -3,7 +3,7 @@
 #include "common.h"
 #include <pthread.h>
 
-#include <hackrf.h>
+
 
 #include <ctype.h>
 #include <getopt.h>
@@ -25,7 +25,12 @@
 #include "ble/crc.h"
 #include "ble/channel.h"
 #include "ble/gfsk.h"
+
 #include "utils/data_convert.h"
+#include "utils/data_rw.h"
+#include "utils/data_disp.h"
+
+#include "boards/hackrf_oper.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -67,6 +72,8 @@ int gettimeofday(struct timeval *tv, void *ignored)
 #include <unistd.h>
 #endif
 
+char *board_name = "HACKRF";
+
 #include <signal.h>
 
 #if defined _WIN32
@@ -78,25 +85,7 @@ static inline int TimevalDiff(const struct timeval *a, const struct timeval *b)
     return ((a->tv_sec - b->tv_sec) * 1000000 + (a->tv_usec - b->tv_usec));
 }
 
-volatile bool do_exit = false;
-#ifdef _MSC_VER
-BOOL WINAPI sighandler(int signum)
-{
-    if (CTRL_C_EVENT == signum)
-    {
-        fprintf(stdout, "Caught signal %d\n", signum);
-        do_exit = true;
-        return TRUE;
-    }
-    return FALSE;
-}
-#else
-void sigint_callback_handler(int signum)
-{
-    fprintf(stdout, "Caught signal %d\n", signum);
-    do_exit = true;
-}
-#endif
+
 
 /* File handling for pcap + BTLE, don't use btbb as it's too buggy and slow */
 // TCPDUMP_MAGIC PCAP_VERSION_MAJOR PCAP_VERSION_MINOR thiszone sigfigs snaplen linktype (DLT_BLUETOOTH_LE_LL_WITH_PHDR)
@@ -150,9 +139,6 @@ void write_dummy_entry()
     write_packet_to_file(fh_pcap_store, 10, pkt, 3, 0xFFFFFFF3);
 }
 
-//----------------------------------some sys stuff----------------------------------
-
-//----------------------------------some basic signal definition----------------------------------
 #define SAMPLE_PER_SYMBOL 4 // 4M sampling rate
 
 volatile int rx_buf_offset; // remember to initialize it!
@@ -162,9 +148,6 @@ volatile int rx_buf_offset; // remember to initialize it!
                // samples!!!
 #define LEN_BUF (LEN_BUF_IN_SAMPLE * 2)
 #define LEN_BUF_IN_SYMBOL (LEN_BUF_IN_SAMPLE / SAMPLE_PER_SYMBOL)
-//----------------------------------some basic signal definition----------------------------------
-
-//----------------------------------BTLE SPEC related--------------------------------
 
 #define DEFAULT_CHANNEL 37
 #define DEFAULT_ACCESS_ADDR (0x8E89BED6)
@@ -185,223 +168,6 @@ static void print_usage(void);
 
 volatile int8_t rx_buf[LEN_BUF + LEN_BUF_MAX_NUM_PHY_SAMPLE];
 
-//----------------------------------board specific operation----------------------------------
-
-char *board_name = "HACKRF";
-#define MAX_GAIN 62
-#define DEFAULT_GAIN 6
-
-int rx_callback(hackrf_transfer *transfer)
-{
-    int i;
-    int8_t *p = (int8_t *)transfer->buffer;
-    for (i = 0; i < transfer->valid_length; i++)
-    {
-        rx_buf[rx_buf_offset] = p[i];
-        rx_buf_offset = (rx_buf_offset + 1) & (LEN_BUF - 1); // cyclic buffer
-    }
-    // printf("%d\n", transfer->valid_length); // !!!!it is 262144 always!!!! Now it is 4096. Defined in hackrf.c
-    // lib_device->buffer_size
-    return (0);
-}
-
-int init_board()
-{
-    int result = hackrf_init();
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_init() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-#ifdef _MSC_VER
-    SetConsoleCtrlHandler((PHANDLER_ROUTINE)sighandler, TRUE);
-#else
-    signal(SIGINT, &sigint_callback_handler);
-    signal(SIGILL, &sigint_callback_handler);
-    signal(SIGFPE, &sigint_callback_handler);
-    signal(SIGSEGV, &sigint_callback_handler);
-    signal(SIGTERM, &sigint_callback_handler);
-    signal(SIGABRT, &sigint_callback_handler);
-#endif
-
-    return (0);
-}
-
-int board_set_freq(void *device, uint64_t freq_hz)
-{
-    int result = hackrf_set_freq((hackrf_device *)device, freq_hz);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("board_set_freq: hackrf_set_freq() failed: %s (%d)\n", hackrf_error_name(result), result);
-        return (-1);
-    }
-    return (HACKRF_SUCCESS);
-}
-
-inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, hackrf_device **device)
-{
-    int result;
-
-    result = hackrf_open(device);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_open() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-    result = hackrf_set_freq(*device, freq_hz);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_set_freq() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-    result = hackrf_set_sample_rate(*device, SAMPLE_PER_SYMBOL * 1000000ul);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_set_sample_rate() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-    result = hackrf_set_baseband_filter_bandwidth(*device, SAMPLE_PER_SYMBOL * 1000000ul / 2);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_set_baseband_filter_bandwidth() failed: %s (%d)\n", hackrf_error_name(result),
-               result);
-        print_usage();
-        return (-1);
-    }
-
-    printf("Setting VGA gain to %d\n", gain);
-    result = hackrf_set_vga_gain(*device, gain);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_set_vga_gain() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-    printf("Setting LNA gain to %d\n", lnaGain);
-    result = hackrf_set_lna_gain(*device, lnaGain);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_set_lna_gain() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-    printf(amp ? "Enabling amp\n" : "Disabling amp\n");
-    result = hackrf_set_amp_enable(*device, amp);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("open_board: hackrf_set_amp_enable() failed: %s (%d)\n", hackrf_error_name(result), result);
-        print_usage();
-        return (-1);
-    }
-
-    return (0);
-}
-
-void exit_board(hackrf_device *device)
-{
-    if (device != NULL)
-    {
-        hackrf_exit();
-        printf("hackrf_exit() done\n");
-    }
-}
-
-inline int close_board(hackrf_device *device)
-{
-    int result;
-
-    if (device != NULL)
-    {
-        result = hackrf_stop_rx(device);
-        if (result != HACKRF_SUCCESS)
-        {
-            printf("close_board: hackrf_stop_rx() failed: %s (%d)\n", hackrf_error_name(result), result);
-            return (-1);
-        }
-
-        result = hackrf_close(device);
-        if (result != HACKRF_SUCCESS)
-        {
-            printf("close_board: hackrf_close() failed: %s (%d)\n", hackrf_error_name(result), result);
-            return (-1);
-        }
-
-        return (0);
-    }
-    else
-    {
-        return (-1);
-    }
-}
-
-inline int run_board(hackrf_device *device)
-{
-    int result;
-
-    // result = hackrf_stop_rx(device); // this is not necessary for new hackrf driver
-    // if( result != HACKRF_SUCCESS ) {
-    // 	printf("run_board: hackrf_stop_rx() failed: %s (%d)\n", hackrf_error_name(result), result);
-    // 	return(-1);
-    // }
-
-    result = hackrf_start_rx(device, rx_callback, NULL);
-    if (result != HACKRF_SUCCESS)
-    {
-        printf("run_board: hackrf_start_rx() failed: %s (%d)\n", hackrf_error_name(result), result);
-        return (-1);
-    }
-
-    return (0);
-}
-
-inline int config_run_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, void **rf_dev)
-{
-    hackrf_device *dev = NULL;
-
-    (*rf_dev) = dev;
-
-    if (init_board() != 0)
-    {
-        return (-1);
-    }
-
-    if (open_board(freq_hz, gain, lnaGain, amp, &dev) != 0)
-    {
-        (*rf_dev) = dev;
-        return (-1);
-    }
-
-    (*rf_dev) = dev;
-    if (run_board(dev) != 0)
-    {
-        return (-1);
-    }
-
-    return (0);
-}
-
-void stop_close_board(hackrf_device *device)
-{
-    if (close_board(device) != 0)
-    {
-        return;
-    }
-    exit_board(device);
-}
-
-//----------------------------------board specific operation----------------------------------
-
-//----------------------------------print_usage----------------------------------
 static void print_usage()
 {
     printf("Usage:\n");
@@ -444,99 +210,6 @@ static void print_usage()
     printf("      Store packets to pcap file.\n");
     printf("\nSee README for detailed information.\n");
 }
-//----------------------------------print_usage----------------------------------
-
-//----------------------------------MISC MISC MISC----------------------------------
-
-
-
-void save_phy_sample(int8_t *IQ_sample, int num_IQ_sample, char *filename)
-{
-    int i;
-
-    FILE *fp = fopen(filename, "w");
-    if (fp == NULL)
-    {
-        printf("save_phy_sample: fopen failed!\n");
-        return;
-    }
-
-    for (i = 0; i < num_IQ_sample; i++)
-    {
-        if (i % 64 == 0)
-        {
-            fprintf(fp, "\n");
-        }
-        fprintf(fp, "%d, ", IQ_sample[i]);
-    }
-    fprintf(fp, "\n");
-
-    fclose(fp);
-}
-
-void load_phy_sample(int8_t *IQ_sample, int num_IQ_sample, char *filename)
-{
-    int i, tmp_val;
-
-    FILE *fp = fopen(filename, "r");
-    if (fp == NULL)
-    {
-        printf("load_phy_sample: fopen failed!\n");
-        return;
-    }
-
-    i = 0;
-    while (~feof(fp))
-    {
-        if (fscanf(fp, "%d,", &tmp_val))
-        {
-            IQ_sample[i] = tmp_val;
-            i++;
-        }
-        if (num_IQ_sample != -1)
-        {
-            if (i == num_IQ_sample)
-            {
-                break;
-            }
-        }
-        // printf("%d\n", i);
-    }
-    printf("%d I/Q are read.\n", i);
-
-    fclose(fp);
-}
-
-void save_phy_sample_for_matlab(int8_t *IQ_sample, int num_IQ_sample, char *filename)
-{
-    int i;
-
-    FILE *fp = fopen(filename, "w");
-    if (fp == NULL)
-    {
-        printf("save_phy_sample_for_matlab: fopen failed!\n");
-        return;
-    }
-
-    for (i = 0; i < num_IQ_sample; i++)
-    {
-        if (i % 64 == 0)
-        {
-            fprintf(fp, "...\n");
-        }
-        fprintf(fp, "%d ", IQ_sample[i]);
-    }
-    fprintf(fp, "\n");
-
-    fclose(fp);
-}
-//----------------------------------MISC MISC MISC----------------------------------
-
-//----------------------------------BTLE SPEC related--------------------------------
-/**
- * Static table used for the table_driven implementation.
- *****************************************************************************/
-
 
 
 
@@ -1915,6 +1588,11 @@ int main(int argc, char **argv)
     void *rf_dev;
     int8_t *rxp;
 
+    hackrf_rx_context ctx;
+    ctx.rx_buf = rx_buf;
+    ctx.rx_buf_len = LEN_BUF;
+    ctx.rx_buf_offset = 0;
+
     parse_commandline(argc, argv, &chan, &gain, &lnaGain, &amp, &access_addr, &crc_init, &verbose_flag, &raw_flag,
                       &freq_hz, &access_addr_mask, &hop_flag, &filename_pcap);
 
@@ -1934,8 +1612,8 @@ int main(int argc, char **argv)
     }
 
     // run cyclic recv in background
-    do_exit = false;
-    if (config_run_board(freq_hz, gain, lnaGain, amp, &rf_dev) != 0)
+    exit_status = false;
+    if (config_run_board(freq_hz, gain, lnaGain, amp, &rf_dev, &ctx) != 0)
     {
         if (rf_dev != NULL)
         {
@@ -1947,6 +1625,8 @@ int main(int argc, char **argv)
         }
     }
 
+    rx_buf_offset = ctx.rx_buf_offset;
+    
     // init receiver
     receiver_status.pkt_avaliable = 0;
     receiver_status.hop = -1;
@@ -1964,10 +1644,10 @@ int main(int argc, char **argv)
     crc_init_internal = crc_init_reorder(crc_init);
 
     // scan
-    do_exit = false;
+    exit_status = false;
     phase = 0;
     rx_buf_offset = 0;
-    while (do_exit == false)
+    while (exit_status == false)
     { // hackrf_is_streaming(hackrf_dev) == HACKRF_TRUE?
         /*
         if ( (rx_buf_offset-rx_buf_offset_old) > 65536 || (rx_buf_offset-rx_buf_offset_old) < -65536 ) {
