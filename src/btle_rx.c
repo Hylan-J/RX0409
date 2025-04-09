@@ -24,6 +24,7 @@
 #include "ble/whitening.h"
 #include "ble/crc.h"
 #include "ble/channel.h"
+#include "ble/gfsk.h"
 #include "utils/data_convert.h"
 
 #ifdef _WIN32
@@ -182,8 +183,7 @@ volatile int rx_buf_offset; // remember to initialize it!
 
 static void print_usage(void);
 
-typedef int8_t IQ_TYPE;
-volatile IQ_TYPE rx_buf[LEN_BUF + LEN_BUF_MAX_NUM_PHY_SAMPLE];
+volatile int8_t rx_buf[LEN_BUF + LEN_BUF_MAX_NUM_PHY_SAMPLE];
 
 //----------------------------------board specific operation----------------------------------
 
@@ -450,7 +450,7 @@ static void print_usage()
 
 
 
-void save_phy_sample(IQ_TYPE *IQ_sample, int num_IQ_sample, char *filename)
+void save_phy_sample(int8_t *IQ_sample, int num_IQ_sample, char *filename)
 {
     int i;
 
@@ -474,7 +474,7 @@ void save_phy_sample(IQ_TYPE *IQ_sample, int num_IQ_sample, char *filename)
     fclose(fp);
 }
 
-void load_phy_sample(IQ_TYPE *IQ_sample, int num_IQ_sample, char *filename)
+void load_phy_sample(int8_t *IQ_sample, int num_IQ_sample, char *filename)
 {
     int i, tmp_val;
 
@@ -507,7 +507,7 @@ void load_phy_sample(IQ_TYPE *IQ_sample, int num_IQ_sample, char *filename)
     fclose(fp);
 }
 
-void save_phy_sample_for_matlab(IQ_TYPE *IQ_sample, int num_IQ_sample, char *filename)
+void save_phy_sample_for_matlab(int8_t *IQ_sample, int num_IQ_sample, char *filename)
 {
     int i;
 
@@ -897,31 +897,9 @@ uint8_t tmp_byte[2 + 37 + 3]; // header length + maximum payload length 37 + 3 o
 
 RECV_STATUS receiver_status;
 
-void demod_byte(IQ_TYPE *rxp, int num_byte, uint8_t *out_byte)
-{
-    int i, j;
-    int I0, Q0, I1, Q1;
-    uint8_t bit_decision;
-    int sample_idx = 0;
 
-    for (i = 0; i < num_byte; i++)
-    {
-        out_byte[i] = 0;
-        for (j = 0; j < 8; j++)
-        {
-            I0 = rxp[sample_idx];
-            Q0 = rxp[sample_idx + 1];
-            I1 = rxp[sample_idx + 2];
-            Q1 = rxp[sample_idx + 3];
-            bit_decision = (I0 * Q1 - I1 * Q0) > 0 ? 1 : 0;
-            out_byte[i] = out_byte[i] | (bit_decision << j);
 
-            sample_idx = sample_idx + SAMPLE_PER_SYMBOL * 2;
-        }
-    }
-}
-
-inline int search_unique_bits(IQ_TYPE *rxp, int search_len, uint8_t *unique_bits, uint8_t *unique_bits_mask,
+inline int search_unique_bits(int8_t *rxp, int search_len, uint8_t *unique_bits, uint8_t *unique_bits_mask,
                               const int num_bits)
 {
     int i, sp, j, i0, q0, i1, q1, k, p, phase_idx;
@@ -1624,7 +1602,7 @@ void print_adv_pdu_payload(void *adv_pdu_payload, ADV_PDU_TYPE pdu_type, int pay
 }
 
 // demodulates and parses a packet
-void receiver(IQ_TYPE *rxp_in, int buf_len, int channel_number, uint32_t access_addr, uint32_t crc_init,
+void receiver(int8_t *rxp_in, int buf_len, int channel_number, uint32_t access_addr, uint32_t crc_init,
               int verbose_flag, int raw_flag)
 {
     static int pkt_count = 0;
@@ -1636,7 +1614,7 @@ void receiver(IQ_TYPE *rxp_in, int buf_len, int channel_number, uint32_t access_
     ADV_PDU_TYPE adv_pdu_type;
     LL_PDU_TYPE ll_pdu_type;
 
-    IQ_TYPE *rxp = rxp_in;
+    int8_t *rxp = rxp_in;
     int num_demod_byte, hit_idx, buf_len_eaten, adv_tx_add, adv_rx_add, ll_nesn, ll_sn, ll_md, payload_len, time_diff,
         ll_ctrl_pdu_type, i;
     int num_symbol_left = buf_len / (SAMPLE_PER_SYMBOL * 2); // 2 for IQ
@@ -1683,7 +1661,7 @@ void receiver(IQ_TYPE *rxp_in, int buf_len, int channel_number, uint32_t access_
             break;
         }
 
-        demod_byte(rxp, num_demod_byte, tmp_byte);
+        demodulate_byte(rxp, num_demod_byte, tmp_byte, SAMPLE_PER_SYMBOL);
 
         if (!raw_flag)
             dewhitening_bytes(tmp_byte, num_demod_byte, whitening_tables[channel_number], tmp_byte);
@@ -1740,7 +1718,7 @@ void receiver(IQ_TYPE *rxp_in, int buf_len, int channel_number, uint32_t access_
             break;
         }
 
-        demod_byte(rxp, num_demod_byte, tmp_byte + 2);
+        demodulate_byte(rxp, num_demod_byte, tmp_byte + 2, SAMPLE_PER_SYMBOL);
         dewhitening_bytes(tmp_byte + 2, num_demod_byte, whitening_tables[channel_number] + 2, tmp_byte + 2);
         rxp = rxp_in + buf_len_eaten;
         num_symbol_left = (buf_len - buf_len_eaten) / (SAMPLE_PER_SYMBOL * 2);
@@ -1926,9 +1904,6 @@ int receiver_controller(void *rf_dev, int verbose_flag, int *chan, uint32_t *acc
     return (0);
 }
 
-//---------------------------for offline test--------------------------------------
-// IQ_TYPE tmp_buf[2097152];
-//---------------------------for offline test--------------------------------------
 
 int main(int argc, char **argv)
 {
@@ -1938,7 +1913,7 @@ int main(int argc, char **argv)
     uint32_t access_addr, access_addr_mask, crc_init, crc_init_internal;
     bool run_flag = false;
     void *rf_dev;
-    IQ_TYPE *rxp;
+    int8_t *rxp;
 
     parse_commandline(argc, argv, &chan, &gain, &lnaGain, &amp, &access_addr, &crc_init, &verbose_flag, &raw_flag,
                       &freq_hz, &access_addr_mask, &hop_flag, &filename_pcap);
@@ -2009,8 +1984,8 @@ int main(int argc, char **argv)
             // printf("rx_buf_offset cross 0: %d %d %d\n", rx_buf_offset, (LEN_BUF/2), LEN_BUF_MAX_NUM_PHY_SAMPLE);
             phase = 0;
 
-            memcpy((void *)(rx_buf + LEN_BUF), (void *)rx_buf, LEN_BUF_MAX_NUM_PHY_SAMPLE * sizeof(IQ_TYPE));
-            rxp = (IQ_TYPE *)(rx_buf + (LEN_BUF / 2));
+            memcpy((void *)(rx_buf + LEN_BUF), (void *)rx_buf, LEN_BUF_MAX_NUM_PHY_SAMPLE * sizeof(int8_t));
+            rxp = (int8_t *)(rx_buf + (LEN_BUF / 2));
             run_flag = true;
         }
 
@@ -2020,7 +1995,7 @@ int main(int argc, char **argv)
             // printf("rx_buf_offset cross 1: %d %d %d\n", rx_buf_offset, (LEN_BUF/2), LEN_BUF_MAX_NUM_PHY_SAMPLE);
             phase = 1;
 
-            rxp = (IQ_TYPE *)rx_buf;
+            rxp = (int8_t *)rx_buf;
             run_flag = true;
         }
 
