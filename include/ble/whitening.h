@@ -4,6 +4,6 @@
 #include <stdint.h>
 
 extern const uint8_t whitening_tables[40][42];
-void dewhitening_bytes(uint8_t *byte_in, int num_byte, const uint8_t *scramble_table_byte, uint8_t *byte_out);
+void dewhitening_bytes(uint8_t *in_bytes, int num_bytes, const uint8_t *dewhitening_table_byte, uint8_t *out_bytes);
 
 #endif // WHITENING_H

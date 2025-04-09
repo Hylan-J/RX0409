@@ -164,12 +164,18 @@ const uint8_t whitening_tables[40][42] = {
 };
 
 
-
-void dewhitening_bytes(uint8_t *byte_in, int num_byte, const uint8_t *scramble_table_byte, uint8_t *byte_out)
+/**
+ * @brief Dewhiten the input bytes using the dewhitening table.
+ * @param in_bytes: The input bytes to dewhiten.
+ * @param num_bytes: The number of bytes to dewhiten.
+ * @param dewhitening_table_byte: The dewhitening table to use.
+ * @param out_bytes: The output bytes after dewhitening.
+ * @note The dewhitening table is a 1D array of bytes that is used to dewhiten the input bytes.
+ */
+void dewhitening_bytes(uint8_t *in_bytes, int num_bytes, const uint8_t *dewhitening_table_byte, uint8_t *out_bytes)
 {
-    int i;
-    for (i = 0; i < num_byte; i++)
+    for (int i = 0; i < num_bytes; i++)
     {
-        byte_out[i] = byte_in[i] ^ scramble_table_byte[i];
+        out_bytes[i] = in_bytes[i] ^ dewhitening_table_byte[i];
     }
 }
