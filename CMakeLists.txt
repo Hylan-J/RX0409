@@ -40,16 +40,18 @@ add_library(libgetopt_static STATIC
 endif()
 
 # 设置变量包含所有源文件
-file(GLOB PROJECT_SOURCES src/*.c src/ble/*.c)
+file(GLOB PROJECT_SOURCES "src/*.c" "src/ble/*.c")
 
 # 设置变量包含所有头文件
-file(GLOB PROJECT_HEADERS include/*.h include/ble/*.h)
+file(GLOB PROJECT_HEADERS "include/*.h" "include/ble/*.h")
+
+# 创建可执行文件
+# add_executable(MyProject ${MY_PROJECT_SOURCES})
 
 
 include_directories(
     ${LIBHACKRF_INCLUDE_DIR}
-    include
-    include/ble
+    PROJECT_HEADERS
 )
 
 add_executable(btle_rx src/btle_rx.c)
