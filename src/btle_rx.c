@@ -1538,9 +1538,10 @@ int main(int argc, char **argv)
     int8_t *rxp;
 
     hackrf_rx_context ctx;
-    ctx.rx_buf = rx_buf;
+    ctx.rx_buf = (int8_t *)malloc(LEN_BUF + LEN_BUF_MAX_NUM_PHY_SAMPLE); // 动态分配缓冲区
     ctx.len_buf = LEN_BUF;
     ctx.rx_buf_offset = 0;
+
 
     parse_commandline(argc, argv, &chan, &gain, &lnaGain, &amp, &access_addr, &crc_init, &verbose_flag, &raw_flag,
                       &freq_hz, &access_addr_mask, &hop_flag, &filename_pcap);
@@ -1574,7 +1575,13 @@ int main(int argc, char **argv)
         }
     }
 
-    rx_buf_offset = ctx.rx_buf_offset;
+
+    // 将结构体中的值同步到全局变量
+    for (int i = 0; i < ctx->len_buf; i++)
+    {
+        rx_buf[i] = ctx->rx_buf[i];
+    }
+    rx_buf_offset = ctx->rx_buf_offset;
 
     // init receiver
     receiver_status.pkt_avaliable = 0;
