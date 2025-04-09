@@ -537,35 +537,7 @@ void save_phy_sample_for_matlab(IQ_TYPE *IQ_sample, int num_IQ_sample, char *fil
  *****************************************************************************/
 
 
-uint64_t get_freq_by_channel_number(int channel_number)
-{
-    uint64_t freq_hz;
-    if (channel_number == 37)
-    {
-        freq_hz = 2402000000ull;
-    }
-    else if (channel_number == 38)
-    {
-        freq_hz = 2426000000ull;
-    }
-    else if (channel_number == 39)
-    {
-        freq_hz = 2480000000ull;
-    }
-    else if (channel_number >= 0 && channel_number <= 10)
-    {
-        freq_hz = 2404000000ull + channel_number * 2000000ull;
-    }
-    else if (channel_number >= 11 && channel_number <= 36)
-    {
-        freq_hz = 2428000000ull + (channel_number - 11) * 2000000ull;
-    }
-    else
-    {
-        freq_hz = 0xffffffffffffffff;
-    }
-    return (freq_hz);
-}
+
 
 typedef enum
 {
@@ -728,17 +700,6 @@ typedef struct
     uint8_t payload_byte[40];
 } ADV_PDU_PAYLOAD_TYPE_R;
 
-/**
- * Update the crc value with new data.
- *
- * \param crc      The current crc value.
- * \param data     Pointer to a buffer of \a data_len bytes.
- * \param data_len Number of bytes in the \a data buffer.
- * \return         The updated crc value.
- *****************************************************************************/
-
-
-//----------------------------------BTLE SPEC related----------------------------------
 
 //----------------------------------command line parameters----------------------------------
 // Parse the command line arguments and return optional parameters as
@@ -1824,14 +1785,7 @@ void receiver(IQ_TYPE *rxp_in, int buf_len, int channel_number, uint32_t access_
 //----------------------------------receiver----------------------------------
 
 //---------------------handle freq hop for channel mapping 1FFFFFFFFF--------------------
-bool chm_is_full_map(uint8_t *chm)
-{
-    if ((chm[0] == 0x1F) && (chm[1] == 0xFF) && (chm[2] == 0xFF) && (chm[3] == 0xFF) && (chm[4] == 0xFF))
-    {
-        return (true);
-    }
-    return (false);
-}
+
 
 // state machine
 int receiver_controller(void *rf_dev, int verbose_flag, int *chan, uint32_t *access_addr, uint32_t *crc_init_internal)
