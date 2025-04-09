@@ -114,7 +114,7 @@ inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, int 
         return (-1);
     }
 
-    result = hackrf_set_baseband_filter_bandwidth(*device, SAMPLE_PER_SYMBOL * 1000000ul / 2);
+    result = hackrf_set_baseband_filter_bandwidth(*device, sps * 1000000ul / 2);
     if (result != HACKRF_SUCCESS)
     {
         printf("open_board: hackrf_set_baseband_filter_bandwidth() failed: %s (%d)\n", hackrf_error_name(result),

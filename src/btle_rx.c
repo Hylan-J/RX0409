@@ -1562,7 +1562,7 @@ int main(int argc, char **argv)
 
     // run cyclic recv in background
     set_exit_status(false);
-    if (config_run_board(freq_hz, gain, lnaGain, amp, SAMPLE_PER_SYMBOL & rf_dev, &ctx) != 0)
+    if (config_run_board(freq_hz, gain, lnaGain, amp, SAMPLE_PER_SYMBOL, & rf_dev, &ctx) != 0)
     {
         if (rf_dev != NULL)
         {
