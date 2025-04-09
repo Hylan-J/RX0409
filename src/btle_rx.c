@@ -97,47 +97,8 @@ const int PCAP_HDR_TCPDUMP_LEN = 24;
 char *filename_pcap = NULL;
 FILE *fh_pcap_store;
 
-void init_pcap_file()
-{
-    fh_pcap_store = fopen(filename_pcap, "wb");
-    fwrite(PCAP_HDR_TCPDUMP, 1, PCAP_HDR_TCPDUMP_LEN, fh_pcap_store);
-}
-
-typedef struct
-{
-    int sec;
-    int usec;
-    int caplen;
-    int len;
-} pcap_header;
 
 const uint8_t BTLE_HEADER_LEN = 10;
-
-// http://www.whiterocker.com/bt/LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR.html
-// num_demod_byte -- LE packet: header + data
-void write_packet_to_file(FILE *fh, int packet_len, uint8_t *packet, uint8_t channel, uint32_t access_addr)
-{
-    // flags: 0x0001 indicates the LE Packet is de-whitened
-    // pcap header: tv_sec tv_usec caplen len
-    pcap_header header_pcap;
-    // header_pcap.sec = packetcount++;
-    header_pcap.caplen = htonl(BTLE_HEADER_LEN + 4 + packet_len);
-    header_pcap.len = htonl(BTLE_HEADER_LEN + 4 + packet_len);
-    fwrite(&header_pcap, 16, 1, fh_pcap_store);
-    // BTLE header: RF_Channel:1 Signal_Power:1 Noise_Power:1 Access_address_off:1 Reference_access_address (receiver):4
-    // flags:2 packet
-    uint8_t header_btle[10] = {channel, 0, 0, 0, 0, 0, 0, 0, 1, 0};
-    fwrite(header_btle, 1, 10, fh);
-    fwrite(&access_addr, 1, 4, fh);
-    fwrite(packet, 1, packet_len, fh);
-}
-void write_dummy_entry()
-{
-    uint8_t pkt[10] = {7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
-    write_packet_to_file(fh_pcap_store, 10, pkt, 1, 0xFFFFFFF1);
-    write_packet_to_file(fh_pcap_store, 10, pkt, 2, 0xFFFFFFF2);
-    write_packet_to_file(fh_pcap_store, 10, pkt, 3, 0xFFFFFFF3);
-}
 
 #define SAMPLE_PER_SYMBOL 4 // 4M sampling rate
 
@@ -1590,7 +1551,7 @@ int main(int argc, char **argv)
 
     hackrf_rx_context ctx;
     ctx.rx_buf = rx_buf;
-    ctx.rx_buf_len = LEN_BUF;
+    ctx.len_buf = LEN_BUF;
     ctx.rx_buf_offset = 0;
 
     parse_commandline(argc, argv, &chan, &gain, &lnaGain, &amp, &access_addr, &crc_init, &verbose_flag, &raw_flag,
@@ -1626,7 +1587,7 @@ int main(int argc, char **argv)
     }
 
     rx_buf_offset = ctx.rx_buf_offset;
-    
+
     // init receiver
     receiver_status.pkt_avaliable = 0;
     receiver_status.hop = -1;
