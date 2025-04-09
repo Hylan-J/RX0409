@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
-project(btle-tools C)
+project(ble-tools C)
 set(MAJOR_VERSION 0)
 set(MINOR_VERSION 5)
-set(PACKAGE btle-tools)
+set(PACKAGE ble-tools)
 set(VERSION_STRING ${MAJOR_VERSION}.${MINOR_VERSION})
 set(VERSION ${VERSION_STRING})
 
@@ -39,29 +39,27 @@ add_library(libgetopt_static STATIC
 )
 endif()
 
-# 设置变量包含所有源文件
-file(GLOB PROJECT_SOURCES "src/*.c" "src/ble/*.c")
 
-# 设置变量包含所有头文件
-file(GLOB PROJECT_HEADERS "include/*.h" "include/ble/*.h")
+# 包含头文件目录（包含子目录结构）
+include_directories(include ${LIBHACKRF_INCLUDE_DIR})
+LIST(APPEND TOOLS_LINK_LIBS ${LIBHACKRF_LIBRARIES})
 
-# 创建可执行文件
-# add_executable(MyProject ${MY_PROJECT_SOURCES})
-
-
-include_directories(
-    ${LIBHACKRF_INCLUDE_DIR}
-    PROJECT_HEADERS
+# 收集所有源文件
+file(GLOB SOURCES
+    "src/*.c"
+    "src/ble/*.c"
 )
 
-add_executable(btle_rx src/btle_rx.c)
+# 创建可执行文件
+add_executable(btle_rx ${SOURCES})
+
+target_link_libraries(btle_rx 
+  ${TOOLS_LINK_LIBS} 
+  m  # 数学库
+)
 
 
 install(TARGETS btle_rx RUNTIME DESTINATION ${INSTALL_DEFAULT_BINDIR})
-
-
-
-LIST(APPEND TOOLS_LINK_LIBS ${LIBHACKRF_LIBRARIES})
 
 IF(NOT DEFINED C_INLINE)
    ADD_DEFINITIONS("-Dinline=")
@@ -71,8 +69,6 @@ ENDIF(NOT DEFINED C_INLINE)
 if(MSVC)
 LIST(APPEND TOOLS_LINK_LIBS libgetopt_static)
 endif()
-
-target_link_libraries(btle_rx ${TOOLS_LINK_LIBS} m)
 
 
 
