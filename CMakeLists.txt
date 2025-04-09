@@ -48,6 +48,7 @@ LIST(APPEND TOOLS_LINK_LIBS ${LIBHACKRF_LIBRARIES})
 file(GLOB SOURCES
     "src/*.c"
     "src/ble/*.c"
+    "src/utils/*.c"
 )
 
 # 创建可执行文件

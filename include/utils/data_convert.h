@@ -1,8 +1,11 @@
 #ifndef DATA_CONVERT_H
 #define DATA_CONVERT_H
 
+#include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 char *toupper_str(char *input_str, char *output_str);
 
