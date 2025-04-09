@@ -39,4 +39,7 @@ inline int close_board(hackrf_device *device);
 void stop_close_board(hackrf_device *device);
 void exit_board(hackrf_device *device);
 
+void set_exit_status(bool status);
+bool get_exit_status();
+
 #endif // HACKRF_OPER_H

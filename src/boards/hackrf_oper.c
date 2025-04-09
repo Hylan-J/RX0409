@@ -10,7 +10,17 @@
 #include <signal.h>
 #endif
 
-volatile bool exit_status = false;
+static volatile bool exit_status = false;
+
+void set_exit_status(bool status)
+{
+    exit_status = status;
+    return;
+}
+bool get_exit_status()
+{
+    return exit_status;
+}
 
 #ifdef _MSC_VER
 BOOL WINAPI sighandler_for_windows(int signum)
@@ -18,7 +28,7 @@ BOOL WINAPI sighandler_for_windows(int signum)
     if (CTRL_C_EVENT == signum)
     {
         fprintf(stdout, "Caught signal %d\n", signum);
-        exit_status = true;
+        set_exit_status(true);
         return TRUE;
     }
     return FALSE;
@@ -27,7 +37,7 @@ BOOL WINAPI sighandler_for_windows(int signum)
 void sighandler_for_others(int signum)
 {
     fprintf(stdout, "Caught signal %d\n", signum);
-    exit_status = true;
+    set_exit_status(true);
 }
 #endif
 
@@ -223,3 +233,5 @@ void stop_close_board(hackrf_device *device)
     }
     exit_board(device);
 }
+
+

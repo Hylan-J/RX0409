@@ -1368,7 +1368,7 @@ void receiver(int8_t *rxp_in, int buf_len, int channel_number, uint32_t access_a
 
         printf("%07dus Pkt%03d Ch%d AA:%08x ", time_diff, pkt_count, channel_number, access_addr);
         if (filename_pcap != NULL)
-            write_packet_to_file(fh_pcap_store, payload_len + 2, tmp_byte, channel_number, access_addr);
+            write_packet_to_file(fh_pcap_store, BTLE_HEADER_LEN, payload_len + 2, tmp_byte, channel_number, access_addr, fh_pcap_store);
 
         if (adv_flag)
         {
@@ -1550,7 +1550,7 @@ int main(int argc, char **argv)
     int8_t *rxp;
 
     hackrf_rx_context ctx;
-    ctx.rx_buf = rx_buf;
+    ctx.rx_buf = &rx_buf;
     ctx.len_buf = LEN_BUF;
     ctx.rx_buf_offset = 0;
 
@@ -1569,11 +1569,11 @@ int main(int argc, char **argv)
     if (filename_pcap != NULL)
     {
         printf("will store packets to: %s\n", filename_pcap);
-        init_pcap_file();
+        init_pcap_file(filename_pcap, fh_pcap_store, PCAP_HDR_TCPDUMP, PCAP_HDR_TCPDUMP_LEN);
     }
 
     // run cyclic recv in background
-    exit_status = false;
+    set_exit_status(false);
     if (config_run_board(freq_hz, gain, lnaGain, amp, &rf_dev, &ctx) != 0)
     {
         if (rf_dev != NULL)
@@ -1605,10 +1605,10 @@ int main(int argc, char **argv)
     crc_init_internal = crc_init_reorder(crc_init);
 
     // scan
-    exit_status = false;
+    set_exit_status(false);
     phase = 0;
     rx_buf_offset = 0;
-    while (exit_status == false)
+    while (get_exit_status() == false)
     { // hackrf_is_streaming(hackrf_dev) == HACKRF_TRUE?
         /*
         if ( (rx_buf_offset-rx_buf_offset_old) > 65536 || (rx_buf_offset-rx_buf_offset_old) < -65536 ) {
