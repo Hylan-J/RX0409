@@ -6,5 +6,5 @@ mkdir build
 cd build
 cmake ../
 make
-./src/btle_rx
+./btle_rx
 ···
