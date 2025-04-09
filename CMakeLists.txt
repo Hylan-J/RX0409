@@ -27,7 +27,52 @@ CONFIGURE_FILE (
   "${PROJECT_SOURCE_DIR}/src/common.h"
 )
 
-add_subdirectory(src)
+########################################################################
+# Add subdirectories
+########################################################################
+set(INSTALL_DEFAULT_BINDIR "bin" CACHE STRING "Appended to CMAKE_INSTALL_PREFIX")
+
+# 处理 MSVC 特定的库
+if(MSVC)
+add_library(libgetopt_static STATIC
+    ../getopt/getopt.c
+)
+endif()
+
+# 设置变量包含所有源文件
+file(GLOB PROJECT_SOURCES src/*.c src/ble/*.c)
+
+# 设置变量包含所有头文件
+file(GLOB PROJECT_HEADERS include/*.h include/ble/*.h)
+
+
+include_directories(
+    ${LIBHACKRF_INCLUDE_DIR}
+    include
+    include/ble
+)
+
+add_executable(btle_rx src/btle_rx.c)
+
+
+install(TARGETS btle_rx RUNTIME DESTINATION ${INSTALL_DEFAULT_BINDIR})
+
+
+
+LIST(APPEND TOOLS_LINK_LIBS ${LIBHACKRF_LIBRARIES})
+
+IF(NOT DEFINED C_INLINE)
+   ADD_DEFINITIONS("-Dinline=")
+ENDIF(NOT DEFINED C_INLINE)
+
+# 处理 MSVC 特定的库
+if(MSVC)
+LIST(APPEND TOOLS_LINK_LIBS libgetopt_static)
+endif()
+
+target_link_libraries(btle_rx ${TOOLS_LINK_LIBS} m)
+
+
 
 ########################################################################
 # Create uninstall target
