@@ -23,6 +23,7 @@
 
 #include "ble/whitening.h"
 #include "ble/crc.h"
+#include "ble/channel.h"
 #include "utils/data_convert.h"
 
 #ifdef _WIN32
