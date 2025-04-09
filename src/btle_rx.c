@@ -3,8 +3,6 @@
 #include "common.h"
 #include <pthread.h>
 
-
-
 #include <ctype.h>
 #include <getopt.h>
 #include <math.h>
@@ -21,14 +19,14 @@
 
 #include <netinet/in.h>
 
-#include "ble/whitening.h"
-#include "ble/crc.h"
 #include "ble/channel.h"
+#include "ble/crc.h"
 #include "ble/gfsk.h"
+#include "ble/whitening.h"
 
 #include "utils/data_convert.h"
-#include "utils/data_rw.h"
 #include "utils/data_disp.h"
+#include "utils/data_rw.h"
 
 #include "boards/hackrf_oper.h"
 
@@ -85,8 +83,6 @@ static inline int TimevalDiff(const struct timeval *a, const struct timeval *b)
     return ((a->tv_sec - b->tv_sec) * 1000000 + (a->tv_usec - b->tv_usec));
 }
 
-
-
 /* File handling for pcap + BTLE, don't use btbb as it's too buggy and slow */
 // TCPDUMP_MAGIC PCAP_VERSION_MAJOR PCAP_VERSION_MINOR thiszone sigfigs snaplen linktype (DLT_BLUETOOTH_LE_LL_WITH_PHDR)
 // 0xa1b2c3d4 \x00\x02 \x00\x04 \x00\x00\x00\x00 \x00\x00\x00\x00 \x00\x00\x05\xDC \x00\x00\x01\x00
@@ -96,7 +92,6 @@ const int PCAP_HDR_TCPDUMP_LEN = 24;
 // const char* PCAP_FILE_NAME = "btle_store.pcap";
 char *filename_pcap = NULL;
 FILE *fh_pcap_store;
-
 
 const uint8_t BTLE_HEADER_LEN = 10;
 
@@ -171,8 +166,6 @@ static void print_usage()
     printf("      Store packets to pcap file.\n");
     printf("\nSee README for detailed information.\n");
 }
-
-
 
 typedef enum
 {
@@ -334,7 +327,6 @@ typedef struct
 {
     uint8_t payload_byte[40];
 } ADV_PDU_PAYLOAD_TYPE_R;
-
 
 //----------------------------------command line parameters----------------------------------
 // Parse the command line arguments and return optional parameters as
@@ -530,8 +522,6 @@ uint8_t access_bit_mask[NUM_ACCESS_ADDR_BYTE * 8];
 uint8_t tmp_byte[2 + 37 + 3]; // header length + maximum payload length 37 + 3 octets CRC
 
 RECV_STATUS receiver_status;
-
-
 
 inline int search_unique_bits(int8_t *rxp, int search_len, uint8_t *unique_bits, uint8_t *unique_bits_mask,
                               const int num_bits)
@@ -1020,7 +1010,6 @@ void parse_adv_pdu_header_byte(uint8_t *byte_in, ADV_PDU_TYPE *pdu_type, int *tx
     (*payload_len) = (byte_in[1] & 0x3F);
 }
 
-
 void print_ll_pdu_payload(void *ll_pdu_payload, LL_PDU_TYPE pdu_type, int ctrl_pdu_type, int num_payload_byte,
                           bool crc_flag)
 {
@@ -1367,8 +1356,9 @@ void receiver(int8_t *rxp_in, int buf_len, int channel_number, uint32_t access_a
         time_pre_pkt = time_current_pkt;
 
         printf("%07dus Pkt%03d Ch%d AA:%08x ", time_diff, pkt_count, channel_number, access_addr);
-        if (filename_pcap != NULL)
-            write_packet_to_file(fh_pcap_store, BTLE_HEADER_LEN, payload_len + 2, tmp_byte, channel_number, access_addr, fh_pcap_store);
+        // if (filename_pcap != NULL)
+        // write_packet_to_file(fh_pcap_store, BTLE_HEADER_LEN, payload_len + 2, tmp_byte, channel_number, access_addr,
+        // fh_pcap_store);
 
         if (adv_flag)
         {
@@ -1398,7 +1388,6 @@ void receiver(int8_t *rxp_in, int buf_len, int channel_number, uint32_t access_a
 //----------------------------------receiver----------------------------------
 
 //---------------------handle freq hop for channel mapping 1FFFFFFFFF--------------------
-
 
 // state machine
 int receiver_controller(void *rf_dev, int verbose_flag, int *chan, uint32_t *access_addr, uint32_t *crc_init_internal)
@@ -1538,7 +1527,6 @@ int receiver_controller(void *rf_dev, int verbose_flag, int *chan, uint32_t *acc
     return (0);
 }
 
-
 int main(int argc, char **argv)
 {
     uint64_t freq_hz;
@@ -1550,7 +1538,7 @@ int main(int argc, char **argv)
     int8_t *rxp;
 
     hackrf_rx_context ctx;
-    ctx.rx_buf = &rx_buf;
+    ctx.rx_buf = rx_buf;
     ctx.len_buf = LEN_BUF;
     ctx.rx_buf_offset = 0;
 
@@ -1566,15 +1554,15 @@ int main(int argc, char **argv)
            "file=%s\n",
            chan, freq_hz / 1000000, access_addr, crc_init, raw_flag, verbose_flag, gain, board_name, filename_pcap);
 
-    if (filename_pcap != NULL)
-    {
-        printf("will store packets to: %s\n", filename_pcap);
-        init_pcap_file(filename_pcap, fh_pcap_store, PCAP_HDR_TCPDUMP, PCAP_HDR_TCPDUMP_LEN);
-    }
+    // if (filename_pcap != NULL)
+    // {
+    //     printf("will store packets to: %s\n", filename_pcap);
+    //     init_pcap_file(filename_pcap, fh_pcap_store, PCAP_HDR_TCPDUMP, PCAP_HDR_TCPDUMP_LEN);
+    // }
 
     // run cyclic recv in background
     set_exit_status(false);
-    if (config_run_board(freq_hz, gain, lnaGain, amp, &rf_dev, &ctx) != 0)
+    if (config_run_board(freq_hz, gain, lnaGain, amp, SAMPLE_PER_SYMBOL & rf_dev, &ctx) != 0)
     {
         if (rf_dev != NULL)
         {

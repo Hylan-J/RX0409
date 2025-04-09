@@ -89,7 +89,7 @@ int board_set_freq(void *device, uint64_t freq_hz)
     return (HACKRF_SUCCESS);
 }
 
-inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, hackrf_device **device)
+inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, int sps, hackrf_device **device)
 {
     int result;
 
@@ -107,7 +107,7 @@ inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, hack
         return (-1);
     }
 
-    result = hackrf_set_sample_rate(*device, SAMPLE_PER_SYMBOL * 1000000ul);
+    result = hackrf_set_sample_rate(*device, sps * 1000000ul);
     if (result != HACKRF_SUCCESS)
     {
         printf("open_board: hackrf_set_sample_rate() failed: %s (%d)\n", hackrf_error_name(result), result);
@@ -199,7 +199,7 @@ inline int run_board(hackrf_device *device, hackrf_rx_context *ctx)
     return (0);
 }
 
-inline int config_run_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, void **rf_dev, hackrf_rx_context *ctx)
+inline int config_run_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, int sps, void **rf_dev, hackrf_rx_context *ctx)
 {
     hackrf_device *dev = NULL;
 
@@ -210,7 +210,7 @@ inline int config_run_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp
         return (-1);
     }
 
-    if (open_board(freq_hz, gain, lnaGain, amp, &dev) != 0)
+    if (open_board(freq_hz, gain, lnaGain, amp, sps, &dev) != 0)
     {
         (*rf_dev) = dev;
         return (-1);

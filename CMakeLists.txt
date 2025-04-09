@@ -49,6 +49,7 @@ file(GLOB SOURCES
     "src/*.c"
     "src/ble/*.c"
     "src/utils/*.c"
+    "src/boards/*.c"
 )
 
 # 创建可执行文件

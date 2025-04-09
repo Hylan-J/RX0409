@@ -21,7 +21,7 @@ typedef struct
     uint32_t len_buf;       // 缓冲区长度
 } hackrf_rx_context;
 
-extern volatile bool exit_status;
+static volatile bool exit_status;
 
 #ifdef _MSC_VER
 BOOL WINAPI sighandler_for_windows(int signum);
@@ -32,8 +32,8 @@ void sighandler_for_others(int signum);
 int rx_callback(hackrf_transfer *transfer);
 int init_board();
 int board_set_freq(void *device, uint64_t freq_hz);
-inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, hackrf_device **device);
-inline int config_run_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, void **rf_dev, hackrf_rx_context *ctx);
+inline int open_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, int sps, hackrf_device **device);
+inline int config_run_board(uint64_t freq_hz, int gain, int lnaGain, uint8_t amp, int sps, void **rf_dev, hackrf_rx_context *ctx);
 inline int run_board(hackrf_device *device, hackrf_rx_context *ctx);
 inline int close_board(hackrf_device *device);
 void stop_close_board(hackrf_device *device);
